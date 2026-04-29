@@ -1,0 +1,158 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: users
+    // Fields: uid, email, displayName, role (admin, advocate, client), createdAt
+    //
+    // Collection: advocates
+    // Fields: uid, name, phone, email, experience, court, specialization, status (pending, approved, rejected), createdAt
+    //
+    // Collection: queries
+    // Fields: fullName, phone, location, category, description, status (new, contacted), createdAt
+    //
+    // Collection: blog_posts
+    // Fields: category, question, authorName, createdAt
+    //
+    // Collection: blog_posts/{postId}/answers
+    // Fields: postId, answer, advocateName, advocateUid, createdAt
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId && isValidId(userId);
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && 
+        ((exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin') ||
+         (request.auth.token.email.lower() == "1legalhelpkolkata@gmail.com") ||
+         (request.auth.token.email.lower() == "mtripti85@gmail.com"));
+    }
+
+    function isApprovedAdvocate() {
+      return isAuthenticated() && 
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'advocate' &&
+        exists(/databases/$(database)/documents/advocates/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/advocates/$(request.auth.uid)).data.status == 'approved';
+    }
+
+    function isValidUser(data) {
+      return data.keys().hasAll(['uid', 'email', 'role']) &&
+             data.uid is string &&
+             data.email is string &&
+             data.role in ['admin', 'advocate', 'client'];
+    }
+
+    function isValidAdvocate(data) {
+      return data.keys().hasAll(['uid', 'name', 'phone', 'email', 'experience', 'court', 'specialization', 'status']) &&
+             data.uid is string &&
+             data.name is string && data.name.size() < 100 &&
+             data.phone is string && data.phone.size() == 10 &&
+             data.email is string &&
+             data.experience is number &&
+             data.court is string &&
+             data.specialization is string &&
+             data.status in ['pending', 'approved', 'rejected'];
+    }
+
+    function isValidQuery(data) {
+      return data.keys().hasAll(['fullName', 'phone', 'location', 'category', 'description', 'status']) &&
+             data.fullName is string && data.fullName.size() < 100 &&
+             data.phone is string && data.phone.size() == 10 &&
+             data.location is string &&
+             data.category is string &&
+             data.description is string && data.description.size() < 5000 &&
+             data.status in ['new', 'contacted'];
+    }
+
+    function isValidBlogPost(data) {
+      return data.keys().hasAll(['category', 'question', 'authorName', 'createdAt']) &&
+             data.category is string &&
+             data.question is string && data.question.size() < 2000 &&
+             data.authorName is string;
+    }
+
+    function isValidBlogAnswer(data) {
+      return data.keys().hasAll(['postId', 'answer', 'authorName', 'authorRole', 'advocateUid', 'createdAt']) &&
+             data.postId is string &&
+             isValidId(data.postId) &&
+             data.answer is string && data.answer.size() > 0 && data.answer.size() < 10000 &&
+             data.authorName is string && data.authorName.size() > 0 &&
+             data.authorRole is string &&
+             data.advocateUid is string && (data.advocateUid == request.auth.uid || isAdmin()) &&
+             data.createdAt == request.time;
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow create: if isAuthenticated() && isValidUser(request.resource.data) && (isOwner(userId) || isAdmin());
+      allow update: if isAuthenticated() && isValidUser(request.resource.data) && 
+        ((isOwner(userId) && (request.resource.data.role == resource.data.role || request.resource.data.role == 'advocate')) || isAdmin());
+    }
+
+    match /advocates/{advocateId} {
+      // Allow public to see approved advocates for the directory
+      // Note: UI handles hiding phone/email, but technically they are in the doc.
+      allow read: if resource.data.status == 'approved' || isOwner(advocateId) || isAdmin();
+      
+      allow create: if isAdmin() || (isAuthenticated() && isOwner(advocateId) && isValidAdvocate(request.resource.data) && request.resource.data.status == 'pending');
+      allow update: if isAdmin() || (
+        isOwner(advocateId) && 
+        isValidAdvocate(request.resource.data) && 
+        request.resource.data.status == resource.data.status &&
+        request.resource.data.uid == resource.data.uid &&
+        request.resource.data.email == resource.data.email
+      );
+      allow delete: if isAdmin();
+    }
+
+    match /queries/{queryId} {
+      allow read: if isAdmin();
+      allow create: if isValidQuery(request.resource.data) && request.resource.data.status == 'new';
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    match /blog_posts/{postId} {
+      allow read: if true;
+      allow create: if isValidBlogPost(request.resource.data);
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+
+      match /answers/{answerId} {
+        allow read: if true;
+        allow create: if isAdmin() || (isApprovedAdvocate() && isValidBlogAnswer(request.resource.data));
+        allow update: if isAdmin();
+        allow delete: if isAdmin();
+      }
+    }
+    
+    // Default deny
+    match /{path=**} {
+      allow read, write: if false;
+    }
+  }
+}

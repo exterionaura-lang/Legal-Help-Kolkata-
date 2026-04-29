@@ -1,0 +1,82 @@
+{
+  "entities": {
+    "User": {
+      "title": "User Profile",
+      "description": "Stores user profile information and roles.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "Firebase Auth UID" },
+        "email": { "type": "string", "format": "email" },
+        "displayName": { "type": "string" },
+        "role": { "type": "string", "enum": ["admin", "advocate", "client"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email", "role"]
+    },
+    "Advocate": {
+      "title": "Advocate Profile",
+      "description": "Detailed profile for advocates seeking registration.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "name": { "type": "string" },
+        "phone": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "experience": { "type": "number" },
+        "court": { "type": "string" },
+        "specialization": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "approved", "rejected"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "name", "phone", "email", "experience", "court", "specialization", "status"]
+    },
+    "LegalQuery": {
+      "title": "Legal Help Query",
+      "description": "Queries submitted by users seeking legal help.",
+      "type": "object",
+      "properties": {
+        "fullName": { "type": "string" },
+        "phone": { "type": "string" },
+        "location": { "type": "string" },
+        "category": { "type": "string" },
+        "description": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "status": { "type": "string", "enum": ["new", "contacted"] }
+      },
+      "required": ["fullName", "phone", "location", "category", "description", "status"]
+    },
+    "BlogPost": {
+      "title": "Blog Question",
+      "description": "Legal questions posted by users in the open forum.",
+      "type": "object",
+      "properties": {
+        "category": { "type": "string" },
+        "question": { "type": "string" },
+        "authorName": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["category", "question", "createdAt"]
+    },
+    "BlogAnswer": {
+      "title": "Blog Answer",
+      "description": "Answers provided by approved advocates or admins to blog questions.",
+      "type": "object",
+      "properties": {
+        "postId": { "type": "string" },
+        "answer": { "type": "string" },
+        "authorName": { "type": "string" },
+        "authorRole": { "type": "string" },
+        "advocateUid": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["postId", "answer", "authorName", "authorRole", "advocateUid", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{uid}": { "schema": "User", "description": "User profiles and roles." },
+    "/advocates/{uid}": { "schema": "Advocate", "description": "Advocate registration and profiles." },
+    "/queries/{queryId}": { "schema": "LegalQuery", "description": "User legal help submissions." },
+    "/blog_posts/{postId}": { "schema": "BlogPost", "description": "Public legal questions." },
+    "/blog_posts/{postId}/answers/{answerId}": { "schema": "BlogAnswer", "description": "Answers to blog questions." }
+  }
+}
