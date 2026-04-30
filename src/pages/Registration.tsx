@@ -208,9 +208,11 @@ export default function Registration({ user }: RegistrationProps) {
                   <Input 
                     id="email" 
                     type="email" 
-                    disabled 
+                    required
                     value={formData.email}
-                    className="rounded-xl border-slate-200 bg-slate-50"
+                    onChange={(e) => setFormData({...formData, email: e.target.value})}
+                    placeholder="advocate@example.com"
+                    className="rounded-xl border-slate-200"
                   />
                 </div>
                 <div className="space-y-2">

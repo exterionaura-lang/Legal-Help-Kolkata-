@@ -1,5 +1,8 @@
 {
 	"appId": "com.legalhelpkolkata.app",
 	"appName": "Legal Help Kolkata",
-	"webDir": "dist"
+	"webDir": "dist",
+	"server": {
+		"androidScheme": "https"
+	}
 }

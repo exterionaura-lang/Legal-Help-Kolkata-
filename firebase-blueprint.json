@@ -65,11 +65,12 @@
         "postId": { "type": "string" },
         "answer": { "type": "string" },
         "authorName": { "type": "string" },
+        "authorEmail": { "type": "string", "format": "email" },
         "authorRole": { "type": "string" },
         "advocateUid": { "type": "string" },
         "createdAt": { "type": "string", "format": "date-time" }
       },
-      "required": ["postId", "answer", "authorName", "authorRole", "advocateUid", "createdAt"]
+      "required": ["postId", "answer", "authorName", "authorEmail", "authorRole", "advocateUid", "createdAt"]
     }
   },
   "firestore": {

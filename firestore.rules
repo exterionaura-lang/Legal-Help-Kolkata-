@@ -20,7 +20,7 @@ service cloud.firestore {
     // Fields: category, question, authorName, createdAt
     //
     // Collection: blog_posts/{postId}/answers
-    // Fields: postId, answer, advocateName, advocateUid, createdAt
+    // Fields: postId, answer, authorName, authorEmail, authorRole, advocateUid, createdAt
     //
     // ===============================================================
 
@@ -92,11 +92,12 @@ service cloud.firestore {
     }
 
     function isValidBlogAnswer(data) {
-      return data.keys().hasAll(['postId', 'answer', 'authorName', 'authorRole', 'advocateUid', 'createdAt']) &&
+      return data.keys().hasAll(['postId', 'answer', 'authorName', 'authorEmail', 'authorRole', 'advocateUid', 'createdAt']) &&
              data.postId is string &&
              isValidId(data.postId) &&
              data.answer is string && data.answer.size() > 0 && data.answer.size() < 10000 &&
              data.authorName is string && data.authorName.size() > 0 &&
+             data.authorEmail is string &&
              data.authorRole is string &&
              data.advocateUid is string && (data.advocateUid == request.auth.uid || isAdmin()) &&
              data.createdAt == request.time;

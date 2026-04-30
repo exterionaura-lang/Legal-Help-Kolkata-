@@ -84,7 +84,9 @@ export default function Navbar({ user, role }: NavbarProps) {
                   {role === 'admin' && (
                     <DropdownMenuItem render={<Link to="/admin">Admin Panel</Link>} />
                   )}
-                  <DropdownMenuItem render={<Link to="/registration">Advocate Profile</Link>} />
+                  <DropdownMenuItem render={<Link to="/registration">
+                    {role === 'advocate' ? 'Advocate Profile' : 'Register as Advocate'}
+                  </Link>} />
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={handleLogout} className="text-red-600">
                     <LogOut className="mr-2 h-4 w-4" />

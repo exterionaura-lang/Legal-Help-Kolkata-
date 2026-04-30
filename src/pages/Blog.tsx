@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { User } from 'firebase/auth';
+import { Link } from 'react-router-dom';
 import { collection, query, orderBy, onSnapshot, addDoc, serverTimestamp, doc, getDoc, deleteDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { handleFirestoreError, OperationType } from '@/lib/firestore-errors';
@@ -33,6 +34,7 @@ interface Answer {
   postId: string;
   answer: string;
   authorName: string;
+  authorEmail: string;
   authorRole: string;
   advocateUid: string;
   createdAt: any;
@@ -106,6 +108,7 @@ export default function Blog({ user, role }: BlogProps) {
     if (!answerText) return;
 
     const name = user?.displayName || contributorNames[postId] || 'Anonymous Contributor';
+    const email = user?.email || 'anonymous@example.com';
 
     const path = `blog_posts/${postId}/answers`;
     try {
@@ -113,6 +116,7 @@ export default function Blog({ user, role }: BlogProps) {
         postId,
         answer: answerText,
         authorName: name,
+        authorEmail: email,
         authorRole: role || 'guest',
         advocateUid: user?.uid || 'anonymous',
         createdAt: serverTimestamp()
@@ -314,28 +318,52 @@ export default function Blog({ user, role }: BlogProps) {
                 </CardContent>
 
                 <CardFooter className="p-8 bg-slate-50 border-t border-slate-100 flex flex-col gap-4">
-                  {!user && (
-                    <Input 
-                      placeholder="Your Name (Optional)" 
-                      className="rounded-xl bg-white border-slate-200"
-                      value={contributorNames[post.id] || ''}
-                      onChange={(e) => setContributorNames(prev => ({ ...prev, [post.id]: e.target.value }))}
-                    />
+                  {(role === 'admin' || isApprovedAdvocate) ? (
+                    <>
+                      <div className="w-full flex gap-4">
+                        <Textarea 
+                          placeholder="Provide your guidance or answer..." 
+                          className="rounded-2xl bg-white min-h-[100px] p-5 text-lg shadow-sm border-slate-200 focus:ring-blue-500/20 transition-all"
+                          value={newAnswer[post.id] || ''}
+                          onChange={(e) => setNewAnswer(prev => ({ ...prev, [post.id]: e.target.value }))}
+                        />
+                        <Button 
+                          onClick={() => handlePostAnswer(post.id)}
+                          className="bg-slate-900 hover:bg-slate-800 h-auto px-8 rounded-2xl shadow-lg transition-transform hover:scale-105 active:scale-95"
+                        >
+                          <Send className="w-6 h-6" />
+                        </Button>
+                      </div>
+                      <p className="text-[10px] text-slate-400 uppercase font-bold tracking-widest text-center">
+                        Posting as {role === 'admin' ? 'Administrator' : 'Verified Advocate'}
+                      </p>
+                    </>
+                  ) : (
+                    <div className="py-6 px-8 bg-blue-50/50 rounded-2xl border border-blue-100 flex items-center justify-between gap-4">
+                      <div className="flex items-center gap-3">
+                        < ShieldCheck className="w-5 h-5 text-blue-600" />
+                        <p className="text-sm font-medium text-slate-600">
+                          {user ? (
+                            role === 'advocate' ? "Your advocate profile is pending approval. Once approved, you can answer questions." : "Only verified advocates and admins can provide legal guidance."
+                          ) : "Please login as a verified advocate to provide legal guidance."}
+                        </p>
+                      </div>
+                      {!user && (
+                        <Link to="/login">
+                          <Button size="sm" variant="outline" className="rounded-xl border-blue-200 text-blue-600 px-6 h-10 font-bold transition-all hover:scale-105 active:scale-95">
+                            Login
+                          </Button>
+                        </Link>
+                      )}
+                      {user && role !== 'admin' && !isApprovedAdvocate && (
+                        <Link to="/registration">
+                          <Button size="sm" variant="outline" className="rounded-xl border-blue-200 text-blue-600 px-6 h-10 font-bold transition-all hover:scale-105 active:scale-95">
+                            Register as Advocate
+                          </Button>
+                        </Link>
+                      )}
+                    </div>
                   )}
-                  <div className="w-full flex gap-4">
-                    <Textarea 
-                      placeholder="Provide your guidance or answer..." 
-                      className="rounded-2xl bg-white min-h-[100px] p-5 text-lg shadow-sm border-slate-200 focus:ring-blue-500/20 transition-all"
-                      value={newAnswer[post.id] || ''}
-                      onChange={(e) => setNewAnswer(prev => ({ ...prev, [post.id]: e.target.value }))}
-                    />
-                    <Button 
-                      onClick={() => handlePostAnswer(post.id)}
-                      className="bg-slate-900 hover:bg-slate-800 h-auto px-8 rounded-2xl shadow-lg transition-transform hover:scale-105 active:scale-95"
-                    >
-                      <Send className="w-6 h-6" />
-                    </Button>
-                  </div>
                 </CardFooter>
               </Card>
             ))}

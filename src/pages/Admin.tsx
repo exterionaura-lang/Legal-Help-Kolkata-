@@ -323,10 +323,24 @@ export default function Admin() {
 
           // Add answer
           const answerRef = doc(collection(db, `blog_posts/${item.id}/answers`));
+          
+          // Map seed advocates to realistic emails
+          const emailMap: Record<string, string> = {
+            'Punyabrata Mukherjee': 'punyabrata@example.com',
+            'Sutapa Mondal': 'sutapa@example.com',
+            'Rajib Gangopadhyay': 'rajib@example.com',
+            'Aninda Sarkar': 'aninda@example.com',
+            'Debashis Ray': 'debashis@example.com',
+            'Mousumi Bhattacharya': 'mousumi@example.com'
+          };
+          
           await setDoc(answerRef, {
+            postId: item.id,
             answer: item.answer,
             authorName: item.advocate,
+            authorEmail: emailMap[item.advocate] || 'verified@example.com',
             authorRole: 'advocate',
+            advocateUid: 'seed_uid',
             createdAt: serverTimestamp()
           });
         }
@@ -384,8 +398,19 @@ export default function Admin() {
   const handleUpdateStatus = async (collectionName: string, id: string, newStatus: string) => {
     try {
       await updateDoc(doc(db, collectionName, id), { status: newStatus });
+      
+      // If we are approving an advocate, ensure their user record is also marked as advocate
+      if (collectionName === 'advocates' && newStatus === 'approved') {
+        const userRef = doc(db, 'users', id);
+        const userSnap = await getDoc(userRef);
+        if (userSnap.exists()) {
+          await updateDoc(userRef, { role: 'advocate' });
+        }
+      }
+      
       toast.success(`Status updated to ${newStatus}`);
     } catch (error) {
+      console.error('Error updating status:', error);
       toast.error('Failed to update status');
     }
   };
