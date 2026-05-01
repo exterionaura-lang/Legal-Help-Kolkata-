@@ -1,22 +1,27 @@
 import React, { useState, useEffect } from 'react';
-import { User } from 'firebase/auth';
-import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { User, deleteUser, reauthenticateWithCredential, EmailAuthProvider, GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
+import { doc, getDoc, setDoc, serverTimestamp, deleteDoc } from 'firebase/firestore';
+import { auth, db } from '@/lib/firebase';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
-import { Briefcase, CheckCircle2, Clock, AlertCircle } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Briefcase, CheckCircle2, Clock, AlertCircle, Trash2, ShieldAlert } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 
 interface RegistrationProps {
   user: User | null;
 }
 
 export default function Registration({ user }: RegistrationProps) {
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [password, setPassword] = useState('');
   const [checking, setChecking] = useState(true);
   const [existingProfile, setExistingProfile] = useState<any>(null);
   const [formData, setFormData] = useState({
@@ -104,6 +109,54 @@ export default function Registration({ user }: RegistrationProps) {
       toast.error('Failed to submit registration. Please try again.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    if (!user) return;
+    setDeleting(true);
+    try {
+      // 1. Delete Firestore Data
+      await deleteDoc(doc(db, 'advocates', user.uid));
+      await deleteDoc(doc(db, 'users', user.uid));
+      
+      // 2. Delete Auth User
+      try {
+        await deleteUser(user);
+        toast.success('Account deleted successfully.');
+        navigate('/');
+      } catch (authError: any) {
+        if (authError.code === 'auth/requires-recent-login') {
+          // If the user uses Google, try to re-auth with popup skipping password
+          const provider = user.providerData[0]?.providerId;
+          if (provider === 'google.com') {
+            const googleProvider = new GoogleAuthProvider();
+            await signInWithPopup(auth, googleProvider);
+            await deleteUser(user);
+            toast.success('Account deleted successfully.');
+            navigate('/');
+          } else if (password) {
+            // Try with password
+            const credential = EmailAuthProvider.credential(user.email!, password);
+            await reauthenticateWithCredential(user, credential);
+            await deleteUser(user);
+            toast.success('Account deleted successfully.');
+            navigate('/');
+          } else {
+            toast.error('This is a sensitive operation and requires recent login. Please enter your password or sign in again.');
+            setDeleting(false);
+            return;
+          }
+        } else {
+          throw authError;
+        }
+      }
+    } catch (error: any) {
+      console.error('Deletion error:', error);
+      toast.error(error.message || 'Failed to delete account.');
+    } finally {
+      setDeleting(false);
+      setShowDeleteConfirm(false);
     }
   };
 
@@ -265,6 +318,59 @@ export default function Registration({ user }: RegistrationProps) {
               </Button>
             </form>
           </CardContent>
+          <CardFooter className="bg-red-50 border-t border-red-200 p-8 flex flex-col items-start gap-4">
+            <div className="flex items-center gap-2 text-red-800">
+              <ShieldAlert className="w-5 h-5" />
+              <h3 className="font-bold">Dangerous Action</h3>
+            </div>
+            <p className="text-sm text-red-600">
+              Deleting your account is permanent and cannot be undone. All your profile information, advocate status, and associated data will be removed from our systems to comply with privacy standards.
+            </p>
+            <Dialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+              <DialogTrigger asChild>
+                <Button variant="destructive" className="rounded-xl flex items-center gap-2 font-bold px-6 py-6 shadow-lg shadow-red-200">
+                  <Trash2 className="w-4 h-4" />
+                  Delete My Account & Data
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="rounded-2xl max-w-md">
+                <DialogHeader>
+                  <DialogTitle className="text-2xl font-black text-slate-900">Are you absolutely sure?</DialogTitle>
+                  <DialogDescription className="text-slate-600 pt-2">
+                    This action is permanent. It will delete your legal profile, your user account, and all associated personal data.
+                  </DialogDescription>
+                </DialogHeader>
+                
+                {user?.providerData[0]?.providerId === 'password' && (
+                  <div className="py-4 space-y-2">
+                    <Label htmlFor="confirm-password">Enter password to confirm</Label>
+                    <Input 
+                      id="confirm-password" 
+                      type="password" 
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="Your account password"
+                      className="rounded-xl"
+                    />
+                  </div>
+                )}
+
+                <DialogFooter className="gap-2 sm:gap-0 mt-4">
+                  <Button variant="outline" onClick={() => setShowDeleteConfirm(false)} className="rounded-xl">Cancel</Button>
+                  <Button 
+                    variant="destructive" 
+                    onClick={handleDeleteAccount} 
+                    disabled={deleting}
+                    className="rounded-xl font-bold px-6"
+                  >
+                    {deleting ? (
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                    ) : 'Yes, Delete Everything'}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          </CardFooter>
         </Card>
       </div>
     </div>
